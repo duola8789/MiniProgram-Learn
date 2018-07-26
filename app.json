@@ -1,0 +1,20 @@
+{
+  "pages":[
+    "pages/wepush/index",
+    "pages/wxml/index",
+    "pages/index/index",
+    "pages/logs/logs"
+  ],
+  "window":{
+    "backgroundTextStyle":"light",
+    "navigationBarBackgroundColor": "#fff",
+    "navigationBarTitleText": "WeChat",
+    "navigationBarTextStyle":"black"
+  },
+  "tabBar": {
+    "list": [
+      {"text": "Home", "pagePath": "pages/index/index"},
+      {"text": "Wxml", "pagePath": "pages/wxml/index"}
+    ]
+  }
+}

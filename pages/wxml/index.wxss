@@ -1,0 +1,7 @@
+/**index.wxss**/
+text {
+  background: red;
+}
+.test{
+  background: red;
+}

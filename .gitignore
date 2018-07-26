@@ -1,0 +1,16 @@
+/node_modules/
+/build/
+/root/
+/src/.remote/
+/npm-debug.log
+sh.exe.stackdump
+release/
+cache/
+miaow.local.js
+src/desktop/test/about/README.md
+src/desktop/test/task1/img/slide03.png
+.DS_Store
+.idea
+lint-report.xml
+unit-report.xml
+.vscode/

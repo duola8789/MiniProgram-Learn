@@ -1,0 +1,18 @@
+<view hover-class="test">
+  <text style="background: {{color}}">当前时间： {{time}}</text>
+</view>
+
+<view wx:if="{{number < 1}}">1</view>
+<view wx:elif="{{number < 3}}">3</view>
+<view wx:else>2</view>
+
+<view wx:for="{{arr}}" wx:key="arr">{{index}} ---- {{item}}</view>
+
+<view wx:for="{{arr}}" wx:for-index="idx" wx:for-item="itemName" wx:key="itemName">{{idx}} ---- {{itemName}}</view>
+
+<switch wx:for="{{objectArray}}" wx:key="unique">{{item.id}}</switch>
+
+<button bindtap="changeTime" hover-class="test" loading="{{loading}}">Click</button>
+
+<map latitude="39.92" longtitude="116.46"></map>
+
