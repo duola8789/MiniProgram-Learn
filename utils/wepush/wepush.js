@@ -8,6 +8,8 @@ const uuid = (function () {
 	};
 })();
 
+const SPLIT_CHAR = '@@';
+
 function WePush(config) {
 	config = config || {};
 	config.devType = config.devType || 'WEB';
@@ -24,6 +26,7 @@ function WePush(config) {
 	this.isReady = false;
 
 	this.requestCallbacks = {}; // 请求的回调map
+	this.topicListeners = {}; // 话题的订阅者
 	this.isReady = false; // 是否就绪
 
 	this.chatToListeners = []; // 上传消息队列
@@ -46,9 +49,19 @@ WePush.prototype.setupConnect = function () {
 	this.socket.on('connect', function () {
 		// 这里也可能是 reconnect
 		// 建立连接后立马注册
-
 		_this.register(function () {
 			this.isReady = true;
+			// ready 置为 true，后续的新sub可以直接发subRequest
+			// disconnect之后，之前sub的话题服务器都会不认，需要重新订阅
+			for (const listenerKey in this.topicListeners) {
+				if (this.topicListeners[listenerKey] && this.topicListeners[listenerKey].length) {
+					const keys = listenerKey.split(SPLIT_CHAR);
+					const topic = keys[0];
+					const pushType = keys[1];
+					// 发送订阅申请
+					this.postSubRequest(topic, pushType);
+				}
+			}
 			// 发送缓存的双向通信的上行消息
 			if (this.chatToListeners.length > 0) {
 				for (let i = 0; i < this.chatToListeners.length; i++) {
@@ -59,7 +72,7 @@ WePush.prototype.setupConnect = function () {
 	});
 
 	this.socket.on('disconnect', function () {
-		// 一旦 disconnect,需要把isReady设置为false
+		// 一旦disconnect,需要把isReady设置为false
 		_this.isReady = false;
 	});
 
@@ -113,6 +126,16 @@ WePush.prototype.responseHandler = function (ret) {
 			callback.call(this, data);
 			delete this.requestCallbacks[data.requestId];
 		}
+	} else if (ret.type === 'ret') {
+		// topic 推送消息过来了
+		const topic = data.topic; // data=>{topic,pushType,body}
+		const pushType = data.pushType;
+		body = base64.decode(data.body);
+		const listenerKey = topic + SPLIT_CHAR + pushType + '';
+		const listenerList = this.topicListeners[listenerKey] || [];
+		for (let i = 0; i < listenerList.length; i++) {
+			listenerList[i].call(this, body);
+		}
 	} else if (ret.type === 'chatMsg') {
 		// 双向通信
 		body = base64.decode(data.msg);
@@ -122,6 +145,48 @@ WePush.prototype.responseHandler = function (ret) {
 			setTimeout(function () {
 				chatCallback.call(_this, body);
 			}, 0);
+		}
+	}
+};
+
+WePush.prototype.postSubRequest = function (topic, pushType, cb) {
+	const data = {
+		topic: topic,
+		subType: 'SUB',
+		pushType: pushType
+	};
+	// multi push
+	if (this.config.accountId && pushType === WePush.PUSH_TYPE.MULTI) {
+		data.accountId = this.config.accountId;
+	}
+
+	this.postRequest(data, 'sub', cb);
+};
+
+// 订阅主题
+WePush.prototype.sub = function (param) {
+	const topic = param.topic;
+	const pushType = param.pushType;
+	const listener = param.listener;
+	const cb = param.callback;
+
+	const listenerKey = topic + SPLIT_CHAR + pushType + '';
+	const listenerList = this.topicListeners[listenerKey] || [];
+	if (listenerList.length) {
+		// 已经有人订阅此话题
+		listenerList.push(listener);
+		if (typeof cb === 'function') {
+			const _this = this;
+			setTimeout(function () {
+				cb.call(_this);
+			}, 0);
+		}
+	} else {
+		listenerList.push(listener);
+		this.topicListeners[topic + SPLIT_CHAR + pushType + ''] = listenerList;
+
+		if (this.isReady) {
+			this.postSubRequest(topic, pushType, cb);
 		}
 	}
 };
@@ -206,6 +271,56 @@ WePush.prototype.authRequest = function (param) {
 		}
 	};
 	this.postRequest(data, 'authReq', cb.bind(this, chatToTo));
+};
+
+WePush.prototype.postUnsubRequest = function (topic, pushType, cb) {
+	const data = {
+		topic: topic,
+		subType: 'UNSUB',
+		pushType: pushType
+	};
+	this.postRequest(data, 'sub', cb);
+};
+
+WePush.prototype.unsub = function (param) {
+	const topic = param.topic;
+	const pushType = param.pushType;
+	const listener = param.listener;
+	const cb = param.callback;
+
+	const listenerKey = topic + SPLIT_CHAR + pushType + '';
+	const listenerList = this.topicListeners[listenerKey];
+
+	if (listenerList && listenerList.length > 0) {
+		if (!listener) {
+			// 全部取消sub
+			listenerList.length = 0;
+		} else {
+			// 取消当前listener
+			for (let i = 0; i < listenerList.length; i++) {
+				if (listenerList[i] === listener) {
+					listenerList.splice(i, 1);
+					break;
+				}
+			}
+		}
+
+		if (listenerList.length === 0) {
+			// 没有人再订阅这个topic了
+			delete this.topicListeners[listenerKey];
+			if (this.isReady) {
+				this.postUnsubRequest(topic, pushType, cb);
+			}
+			return;
+		}
+	}
+
+	if (typeof cb === 'function') {
+		const _this = this;
+		setTimeout(function () {
+			cb.call(_this);
+		}, 0);
+	}
 };
 
 module.exports = WePush;

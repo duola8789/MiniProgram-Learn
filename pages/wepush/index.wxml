@@ -2,5 +2,6 @@
 <view class="container">
   <view class="userinfo">
     <button bindtap="send"> 发送 </button>
+    <button bindtap="unSub"> 取消订阅 </button>
   </view>
 </view>
